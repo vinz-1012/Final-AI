@@ -1,0 +1,13 @@
+﻿Thuat Toan,Nhom,Ket Qua,Thoi Gian (ms),So Node Mo Rong,Diem Phat Vi Pham,Bo Nho (KB),So Lop Xep Duoc
+BFS,Uninformed Search,OK,96.0614,507,0.0000,3137.1016,5
+DFS,Uninformed Search,OK,0.5454,6,0.0000,24.9766,5
+Greedy Best-First,Informed Search,OK,92.8096,507,0.0000,3160.3438,5
+A*,Informed Search,OK,57.1147,111,0.0000,609.6797,5
+Hill Climbing,Local Search,OK,7.3475,2,0.6667,7.2793,5
+Simulated Annealing,Local Search,OK,505.2402,3600,0.0000,6.8828,5
+AND-OR Search,Complex Env,OK,0.0595,1,0.0000,0.6689,2
+LRTA* (Online),Complex Env,OK,2.8669,5,0.0000,12.0195,5
+CSP Backtracking,CSP,OK,0.2398,6,0.0000,2.9766,5
+CSP Min-Conflicts,CSP,OK,0.4167,3,0.6667,3.2812,5
+Minimax,Adversarial,OK,1.1595,20,50.0000,3.6875,2
+Alpha-Beta,Adversarial,OK,0.7478,14,50.0000,3.6875,2
