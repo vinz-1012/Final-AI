@@ -33,7 +33,9 @@ class AStarSearch(BaseSearchAlgorithm):
         if not isinstance(graph, TimetableProblem):
             return None, 0.0, {"error": "Graph must be a TimetableProblem"}
 
-        sections_list = list(graph.sections.keys())
+        # Sắp xếp các lớp học phần theo số lượng ca/phòng khả thi tăng dần (MRV Heuristic)
+        # giúp hướng tìm kiếm vào các biến bị ràng buộc nhiều trước, giảm tối đa số nút phải duyệt.
+        sections_list = sorted(list(graph.sections.keys()), key=lambda s: len(graph.get_domain_for_section(s)))
         if not sections_list:
             execution_time = time.perf_counter() - start_time
             return [], 0.0, {"explored_nodes": 0, "execution_time": execution_time}
@@ -72,14 +74,14 @@ class AStarSearch(BaseSearchAlgorithm):
                     graph.sections, graph.courses, graph.rooms, graph.lecturers
                 )
                 if is_valid:
-                    # Tính vi phạm mềm cộng thêm cho g(n)
-                    temp_timetable = current_state.timetable.copy()
+                    # Tối ưu hóa: Thử gán và gỡ trực tiếp trên timetable hiện tại thay vì copy()
                     lec_id = graph.sections[next_sec].lecturer_id if next_sec in graph.sections else None
-                    temp_timetable.assign(next_sec, period_id, room_id, lec_id)
+                    current_state.timetable.assign(next_sec, period_id, room_id, lec_id)
                     soft_violations = ConstraintChecker.count_soft_violations(
-                        temp_timetable, graph.sections, graph.rooms, graph.periods, graph.lecturers
+                        current_state.timetable, graph.sections, graph.rooms, graph.periods, graph.lecturers
                     )
                     g_val = soft_violations["total"]
+                    current_state.timetable.unassign(next_sec)
                     
                     child_state = current_state.copy_with_assignment(
                         next_sec, period_id, room_id, extra_violations=g_val - current_state.violation_score,

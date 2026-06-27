@@ -32,7 +32,9 @@ class GreedyBestFirstSearch(BaseSearchAlgorithm):
         if not isinstance(graph, TimetableProblem):
             return None, 0.0, {"error": "Graph must be a TimetableProblem"}
 
-        sections_list = list(graph.sections.keys())
+        # Sắp xếp các lớp học phần theo số lượng ca/phòng khả thi tăng dần (MRV Heuristic)
+        # giúp hướng tìm kiếm vào các biến bị ràng buộc nhiều trước, giảm tối đa số nút phải duyệt.
+        sections_list = sorted(list(graph.sections.keys()), key=lambda s: len(graph.get_domain_for_section(s)))
         if not sections_list:
             execution_time = time.perf_counter() - start_time
             return [], 0.0, {"explored_nodes": 0, "execution_time": execution_time}

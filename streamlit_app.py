@@ -282,7 +282,7 @@ tab_view, tab_data, tab_bench, tab_adv = st.tabs([
     "📅 Xem Thời Khóa Biểu", 
     "📊 Quản lý Dữ liệu gốc", 
     "📈 So sánh Hiệu năng", 
-    "🛡️ Phân tích Đối kháng & Dự phòng"
+    "🛡️ So sánh từng nhóm thuật toán"
 ])
 
 # ----------------------------------------------------
@@ -496,42 +496,252 @@ with tab_bench:
             st.pyplot(fig)
 
 # ----------------------------------------------------
-# TAB 4: ADVERSARIAL & COMPLEX PLAN ANALYSIS
+# TAB 4: INTRA-GROUP ALGORITHM COMPARISON
 # ----------------------------------------------------
 with tab_adv:
-    st.markdown("### 🛡️ Phân tích Đối kháng & Lập Kế hoạch dự phòng")
-    
-    col_l, col_r = st.columns(2)
-    with col_l:
-        st.markdown("#### 🌲 Cây kế hoạch dự phòng (AND-OR Search)")
-        st.write("Tìm kế hoạch dự phòng tự động khi phòng học bị sự cố đột xuất giữa kỳ.")
+    st.markdown("### ⚖️ Đối sánh Thuật toán trong Cùng Nhóm")
+    st.write("Thực hiện chạy so sánh trực tiếp hiệu năng, độ phức tạp và chất lượng lời giải giữa các thuật toán trong 6 nhóm AI cốt lõi.")
+
+    # Initialize session state for group benchmark results
+    if "group_bench_results" not in st.session_state:
+        st.session_state.group_bench_results = None
+
+    if st.button("🚀 CHẠY SO SÁNH 6 NHÓM THUẬT TOÁN", use_container_width=True):
+        groups_to_run = {
+            "🔍 Uninformed Search": {
+                "BFS (Breadth-First Search)": BreadthFirstSearch(),
+                "DFS (Depth-First Search)": DepthFirstSearch()
+            },
+            "💡 Informed Search": {
+                "Greedy Best-First Search": GreedyBestFirstSearch(),
+                "A* Search": AStarSearch()
+            },
+            "⛰️ Local Search": {
+                "Hill Climbing": HillClimbingSearch(),
+                "Simulated Annealing": SimulatedAnnealingSearch()
+            },
+            "📋 Constraint Satisfaction (CSP)": {
+                "CSP Backtracking": CSPBacktrackingSearch(),
+                "CSP Min-Conflicts": CSPMinConflictsSearch()
+            },
+            "🌐 Complex Search": {
+                "AND-OR Search": AndOrSearch(),
+                "LRTA* (Online Search)": LrtaStarSearch()
+            },
+            "⚔️ Adversarial Search": {
+                "Minimax Search": MinimaxSearch(),
+                "Alpha-Beta Pruning": AlphaBetaSearch()
+            }
+        }
+
+        results = {}
+        with st.spinner("Đang chạy đối sánh song song 6 nhóm thuật toán trên bộ dữ liệu hiện tại..."):
+            for group_name, algos in groups_to_run.items():
+                results[group_name] = {}
+                for name, searcher in algos.items():
+                    t_start = time.perf_counter()
+                    
+                    # Xác định nút bắt đầu nếu cần thiết
+                    start_node = ""
+                    if name in ["Minimax Search", "Alpha-Beta Pruning", "AND-OR Search"]:
+                        start_node = list(graph.sections.keys())[0] if graph.sections else ""
+                    
+                    try:
+                        path, cost, stats = searcher.search(graph, start_node, "")
+                        t_end = time.perf_counter()
+                        duration = (t_end - t_start) * 1000  # ms
+                        
+                        results[group_name][name] = {
+                            "success": path is not None or name in ["Minimax Search", "Alpha-Beta Pruning"],
+                            "duration_ms": duration,
+                            "explored_nodes": stats.get("explored_nodes", 0),
+                            "cost": cost,
+                            "fitness": stats.get("fitness", 0.0) if "fitness" in stats else (stats.get("best_value", 0.0) if "best_value" in stats else 0.0)
+                        }
+                    except Exception as e:
+                        results[group_name][name] = {
+                            "success": False,
+                            "duration_ms": 0.0,
+                            "explored_nodes": 0,
+                            "cost": 0.0,
+                            "fitness": 0.0,
+                            "error": str(e)
+                        }
+            st.session_state.group_bench_results = results
+            st.success("Đã hoàn thành phân tích đối sánh 6 nhóm thuật toán!")
+
+    if st.session_state.group_bench_results is not None:
+        results = st.session_state.group_bench_results
         
-        target_sec_andor = st.selectbox("Chọn Lớp học phần phân tích (AND-OR):", list(graph.sections.keys()))
-        if st.button("Sinh kế hoạch AND-OR"):
-            andor = AndOrSearch()
-            path, cost, stats = andor.search(graph, target_sec_andor, "")
+        group_tabs = st.tabs(list(results.keys()))
+        
+        # 1. Uninformed Search
+        with group_tabs[0]:
+            g_name = "🔍 Uninformed Search"
+            st.markdown("#### Đối sánh: Breadth-First Search (BFS) vs Depth-First Search (DFS)")
+            st.info("💡 **Lý thuyết**: BFS duyệt theo chiều rộng (từng cấp một) đảm bảo tính tối ưu (tìm thấy giải pháp ngắn nhất trước) nhưng tốn bộ nhớ khủng khiếp. DFS đi sâu nhất có thể trên một nhánh, tốn ít bộ nhớ hơn nhưng dễ đi vào nhánh cụt hoặc không tối ưu.")
             
-            if path:
-                st.success(f"Tìm thấy phương án chính: {path[0]} -> {path[1] if len(path) > 1 else 'Chưa rõ'}")
-                plan = stats.get("contingency_plan")
-                st.json(plan)
-            else:
-                st.error("Không tìm thấy phương án dự phòng phù hợp.")
+            algo1, algo2 = list(results[g_name].keys())[0], list(results[g_name].keys())[1]
+            r1, r2 = results[g_name][algo1], results[g_name][algo2]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"##### 📊 Số liệu kỹ thuật")
+                df_compare = pd.DataFrame({
+                    "Thuộc tính": ["Trạng thái thành công", "Thời gian thực thi (ms)", "Số nút đã duyệt", "Điểm phạt (Cost)", "Điểm Fitness"],
+                    algo1: ["✓ Có" if r1["success"] else "✗ Không", f"{r1['duration_ms']:.2f} ms", f"{r1['explored_nodes']:,}", f"{r1['cost']:.1f}", f"{r1['fitness']:.1f}"],
+                    algo2: ["✓ Có" if r2["success"] else "✗ Không", f"{r2['duration_ms']:.2f} ms", f"{r2['explored_nodes']:,}", f"{r2['cost']:.1f}", f"{r2['fitness']:.1f}"]
+                })
+                st.dataframe(df_compare, use_container_width=True, hide_index=True)
                 
-    with col_r:
-        st.markdown("#### ⚔️ Độ bền TKB đối kháng (Minimax / Alpha-Beta)")
-        st.write("MAX (Người lập lịch) và MIN (Sự cố kẹt phòng học/GV báo bận đột xuất) đối kháng để chọn ca thi/phòng học robust nhất.")
-        
-        target_sec_adv = st.selectbox("Chọn Lớp học phần phân tích (Adversarial):", list(graph.sections.keys()))
-        depth_val = st.slider("Chọn độ sâu cây trò chơi:", 1, 3, 2)
-        
-        if st.button("Phân tích Adversarial Robustness"):
-            ab = AlphaBetaSearch()
-            path, cost, stats = ab.search(graph, target_sec_adv, "", depth=depth_val)
+            with col2:
+                fig, ax = plt.subplots(figsize=(5, 3))
+                fig.patch.set_facecolor('#1e293b')
+                ax.set_facecolor('#0f172a')
+                ax.bar([algo1, algo2], [r1['duration_ms'], r2['duration_ms']], color=["#66fcf1", "#45a29e"])
+                ax.set_title("Thời gian thực thi (ms) - Ít hơn là tốt hơn", color="white", fontsize=9)
+                ax.tick_params(colors="white", labelsize=8)
+                st.pyplot(fig)
+                
+        # 2. Informed Search
+        with group_tabs[1]:
+            g_name = "💡 Informed Search"
+            st.markdown("#### Đối sánh: Greedy Best-First Search vs A* Search")
+            st.info("💡 **Lý thuyết**: Greedy chỉ sử dụng hàm đánh giá heuristic $h(n)$ để đi nhanh nhất tới đích mà bỏ qua chi phí thực tế $g(n)$, dễ bị tối ưu cục bộ. A* kết hợp cả hai $f(n) = g(n) + h(n)$ để vừa tìm kiếm nhanh vừa đảm bảo tính tối ưu tuyệt đối.")
             
-            if path:
-                st.success(f"Phương án xếp lịch robust nhất đề xuất: {stats.get('next_step')}")
-                st.info(f"Điểm bảo an của phương án (Best utility): {stats.get('best_value'):.1f}")
-                st.write(f"Số trường hợp sự cố đã giả lập phân tích: {stats.get('explored_nodes')}")
-            else:
-                st.error("Không tìm được nước đi an toàn.")
+            algo1, algo2 = list(results[g_name].keys())[0], list(results[g_name].keys())[1]
+            r1, r2 = results[g_name][algo1], results[g_name][algo2]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"##### 📊 Số liệu kỹ thuật")
+                df_compare = pd.DataFrame({
+                    "Thuộc tính": ["Trạng thái thành công", "Thời gian thực thi (ms)", "Số nút đã duyệt", "Điểm phạt (Cost)", "Điểm Fitness"],
+                    algo1: ["✓ Có" if r1["success"] else "✗ Không", f"{r1['duration_ms']:.2f} ms", f"{r1['explored_nodes']:,}", f"{r1['cost']:.1f}", f"{r1['fitness']:.1f}"],
+                    algo2: ["✓ Có" if r2["success"] else "✗ Không", f"{r2['duration_ms']:.2f} ms", f"{r2['explored_nodes']:,}", f"{r2['cost']:.1f}", f"{r2['fitness']:.1f}"]
+                })
+                st.dataframe(df_compare, use_container_width=True, hide_index=True)
+                
+            with col2:
+                fig, ax = plt.subplots(figsize=(5, 3))
+                fig.patch.set_facecolor('#1e293b')
+                ax.set_facecolor('#0f172a')
+                ax.bar([algo1, algo2], [r1['duration_ms'], r2['duration_ms']], color=["#66fcf1", "#45a29e"])
+                ax.set_title("Thời gian thực thi (ms) - Ít hơn là tốt hơn", color="white", fontsize=9)
+                ax.tick_params(colors="white", labelsize=8)
+                st.pyplot(fig)
+
+        # 3. Local Search
+        with group_tabs[2]:
+            g_name = "⛰️ Local Search"
+            st.markdown("#### Đối sánh: Hill Climbing vs Simulated Annealing")
+            st.info("💡 **Lý thuyết**: Hill Climbing luôn đi lên hướng tốt nhất cận kề nên rất nhanh nhưng cực kỳ dễ mắc kẹt tại cực trị địa phương (local optima). Simulated Annealing cho phép chấp nhận các bước đi tệ hơn với xác suất giảm dần theo nhiệt độ, giúp nó vượt qua thung lũng để tìm cực trị toàn cục.")
+            
+            algo1, algo2 = list(results[g_name].keys())[0], list(results[g_name].keys())[1]
+            r1, r2 = results[g_name][algo1], results[g_name][algo2]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"##### 📊 Số liệu kỹ thuật")
+                df_compare = pd.DataFrame({
+                    "Thuộc tính": ["Trạng thái thành công", "Thời gian thực thi (ms)", "Số nút đã duyệt", "Điểm phạt (Cost)", "Điểm Fitness"],
+                    algo1: ["✓ Có" if r1["success"] else "✗ Không", f"{r1['duration_ms']:.2f} ms", f"{r1['explored_nodes']:,}", f"{r1['cost']:.1f}", f"{r1['fitness']:.1f}"],
+                    algo2: ["✓ Có" if r2["success"] else "✗ Không", f"{r2['duration_ms']:.2f} ms", f"{r2['explored_nodes']:,}", f"{r2['cost']:.1f}", f"{r2['fitness']:.1f}"]
+                })
+                st.dataframe(df_compare, use_container_width=True, hide_index=True)
+                
+            with col2:
+                fig, ax = plt.subplots(figsize=(5, 3))
+                fig.patch.set_facecolor('#1e293b')
+                ax.set_facecolor('#0f172a')
+                ax.bar([algo1, algo2], [r1['duration_ms'], r2['duration_ms']], color=["#66fcf1", "#45a29e"])
+                ax.set_title("Thời gian thực thi (ms) - Ít hơn là tốt hơn", color="white", fontsize=9)
+                ax.tick_params(colors="white", labelsize=8)
+                st.pyplot(fig)
+
+        # 4. CSP
+        with group_tabs[3]:
+            g_name = "📋 Constraint Satisfaction (CSP)"
+            st.markdown("#### Đối sánh: CSP Backtracking vs CSP Min-Conflicts")
+            st.info("💡 **Lý thuyết**: CSP Backtracking gán biến tuần tự và quay lui khi vi phạm ràng buộc (tìm kiếm hệ thống). CSP Min-Conflicts khởi tạo một trạng thái đầy đủ (nhưng có lỗi) rồi liên tục sửa lỗi bằng cách thay đổi giá trị của biến sao cho số xung đột là tối thiểu, cực kỳ hiệu quả cho dữ liệu lớn.")
+            
+            algo1, algo2 = list(results[g_name].keys())[0], list(results[g_name].keys())[1]
+            r1, r2 = results[g_name][algo1], results[g_name][algo2]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"##### 📊 Số liệu kỹ thuật")
+                df_compare = pd.DataFrame({
+                    "Thuộc tính": ["Trạng thái thành công", "Thời gian thực thi (ms)", "Số nút đã duyệt", "Điểm phạt (Cost)", "Điểm Fitness"],
+                    algo1: ["✓ Có" if r1["success"] else "✗ Không", f"{r1['duration_ms']:.2f} ms", f"{r1['explored_nodes']:,}", f"{r1['cost']:.1f}", f"{r1['fitness']:.1f}"],
+                    algo2: ["✓ Có" if r2["success"] else "✗ Không", f"{r2['duration_ms']:.2f} ms", f"{r2['explored_nodes']:,}", f"{r2['cost']:.1f}", f"{r2['fitness']:.1f}"]
+                })
+                st.dataframe(df_compare, use_container_width=True, hide_index=True)
+                
+            with col2:
+                fig, ax = plt.subplots(figsize=(5, 3))
+                fig.patch.set_facecolor('#1e293b')
+                ax.set_facecolor('#0f172a')
+                ax.bar([algo1, algo2], [r1['duration_ms'], r2['duration_ms']], color=["#66fcf1", "#45a29e"])
+                ax.set_title("Thời gian thực thi (ms) - Ít hơn là tốt hơn", color="white", fontsize=9)
+                ax.tick_params(colors="white", labelsize=8)
+                st.pyplot(fig)
+
+        # 5. Complex Search
+        with group_tabs[4]:
+            g_name = "🌐 Complex Search"
+            st.markdown("#### Đối sánh: AND-OR Search vs LRTA* (Online Search)")
+            st.info("💡 **Lý thuyết**: AND-OR search xây dựng cây kế hoạch dự phòng đối phó với môi trường không chắc chắn (nếu A xảy ra thì làm X, nếu B xảy ra thì làm Y). LRTA* là thuật toán tìm kiếm thời gian thực học hỏi (Learning Real-Time A*), liên tục cập nhật giá trị heuristic trong khi di chuyển thực tế.")
+            
+            algo1, algo2 = list(results[g_name].keys())[0], list(results[g_name].keys())[1]
+            r1, r2 = results[g_name][algo1], results[g_name][algo2]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"##### 📊 Số liệu kỹ thuật")
+                df_compare = pd.DataFrame({
+                    "Thuộc tính": ["Trạng thái thành công", "Thời gian thực thi (ms)", "Số nút đã duyệt", "Điểm phạt (Cost)", "Điểm Fitness"],
+                    algo1: ["✓ Có" if r1["success"] else "✗ Không", f"{r1['duration_ms']:.2f} ms", f"{r1['explored_nodes']:,}", f"{r1['cost']:.1f}", f"{r1['fitness']:.1f}"],
+                    algo2: ["✓ Có" if r2["success"] else "✗ Không", f"{r2['duration_ms']:.2f} ms", f"{r2['explored_nodes']:,}", f"{r2['cost']:.1f}", f"{r2['fitness']:.1f}"]
+                })
+                st.dataframe(df_compare, use_container_width=True, hide_index=True)
+                
+            with col2:
+                fig, ax = plt.subplots(figsize=(5, 3))
+                fig.patch.set_facecolor('#1e293b')
+                ax.set_facecolor('#0f172a')
+                ax.bar([algo1, algo2], [r1['duration_ms'], r2['duration_ms']], color=["#66fcf1", "#45a29e"])
+                ax.set_title("Thời gian thực thi (ms) - Ít hơn là tốt hơn", color="white", fontsize=9)
+                ax.tick_params(colors="white", labelsize=8)
+                st.pyplot(fig)
+
+        # 6. Adversarial Search
+        with group_tabs[5]:
+            g_name = "⚔️ Adversarial Search"
+            st.markdown("#### Đối sánh: Minimax Search vs Alpha-Beta Pruning")
+            st.info("💡 **Lý thuyết**: Cả hai đều tìm kiếm quyết định robust tối ưu chống lại nước đi tệ nhất của đối thủ (sự cố môi trường). Minimax duyệt toàn bộ cây trò chơi nên rất chậm. Alpha-Beta Pruning tối ưu hóa bằng cách cắt bỏ các nhánh chắc chắn không ảnh hưởng đến kết quả cuối cùng, cho ra cùng kết quả nhưng duyệt ít nút hơn đáng kể.")
+            
+            algo1, algo2 = list(results[g_name].keys())[0], list(results[g_name].keys())[1]
+            r1, r2 = results[g_name][algo1], results[g_name][algo2]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"##### 📊 Số liệu kỹ thuật")
+                df_compare = pd.DataFrame({
+                    "Thuộc tính": ["Trạng thái thành công", "Thời gian thực thi (ms)", "Số nút đã duyệt", "Giá trị Tiện ích (Utility)", "Điểm Fitness"],
+                    algo1: ["✓ Có" if r1["success"] else "✗ Không", f"{r1['duration_ms']:.2f} ms", f"{r1['explored_nodes']:,}", f"{r1['cost']:.1f}", f"{r1['fitness']:.1f}"],
+                    algo2: ["✓ Có" if r2["success"] else "✗ Không", f"{r2['duration_ms']:.2f} ms", f"{r2['explored_nodes']:,}", f"{r2['cost']:.1f}", f"{r2['fitness']:.1f}"]
+                })
+                st.dataframe(df_compare, use_container_width=True, hide_index=True)
+                
+            with col2:
+                fig, ax = plt.subplots(figsize=(5, 3))
+                fig.patch.set_facecolor('#1e293b')
+                ax.set_facecolor('#0f172a')
+                ax.bar([algo1, algo2], [r1['explored_nodes'], r2['explored_nodes']], color=["#66fcf1", "#45a29e"])
+                ax.set_title("Số nút đã duyệt (Càng ít càng tốt do cắt tỉa nhánh)", color="white", fontsize=9)
+                ax.tick_params(colors="white", labelsize=8)
+                st.pyplot(fig)
+    else:
+        st.info("💡 Hãy nhấn nút '🚀 CHẠY SO SÁNH 6 NHÓM THUẬT TOÁN' ở trên để tiến hành đối sánh trực tiếp các thuật toán trong từng nhóm.")
+
