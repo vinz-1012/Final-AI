@@ -419,7 +419,7 @@ with tab_data:
                 "Ca tối đa/tuần": l.max_periods_per_week
             })
         st.dataframe(pd.DataFrame(lec_data), use_container_width=True)
-        
+
     with sub_tab4:
         period_data = []
         for p_id, p in graph.periods.items():
@@ -438,61 +438,98 @@ with tab_data:
 # ----------------------------------------------------
 with tab_bench:
     st.markdown("### 📊 So sánh Hiệu năng thuật toán (Benchmark)")
-    st.write("Chạy so sánh thời gian chạy và điểm tối ưu (Fitness) giữa các thuật toán phổ biến.")
-    
+    st.write("Chạy so sánh thời gian chạy và điểm tối ưu (Fitness) giữa **12 thuật toán** thuộc 6 nhóm AI.")
+
     if st.button("🚀 CHẠY SO SÁNH BENCHMARK", use_container_width=True):
+        # Lấy lớp đầu tiên làm start_node cho các thuật toán Adversarial & AND-OR
+        default_start = list(graph.sections.keys())[0] if graph.sections else ""
+
         algorithms_to_compare = {
-            "BFS": BreadthFirstSearch(),
-            "DFS": DepthFirstSearch(),
-            "Greedy": GreedyBestFirstSearch(),
-            "A*": AStarSearch(),
-            "Hill Climbing": HillClimbingSearch(),
-            "Simulated Annealing": SimulatedAnnealingSearch(),
-            "CSP Backtracking": CSPBacktrackingSearch(),
-            "CSP Min-Conflicts": CSPMinConflictsSearch(),
-            "LRTA* (Online)": LrtaStarSearch()
+            # Uninformed Search
+            "BFS":                  (BreadthFirstSearch(),      ""),
+            "DFS":                  (DepthFirstSearch(),         ""),
+            # Informed Search
+            "Greedy":               (GreedyBestFirstSearch(),    ""),
+            "A*":                   (AStarSearch(),              ""),
+            # Local Search
+            "Hill Climbing":        (HillClimbingSearch(),       ""),
+            "Simulated Annealing":  (SimulatedAnnealingSearch(), ""),
+            # CSP
+            "CSP Backtracking":     (CSPBacktrackingSearch(),    ""),
+            "CSP Min-Conflicts":    (CSPMinConflictsSearch(),    ""),
+            # Complex Search
+            "AND-OR Search":        (AndOrSearch(),              default_start),
+            "LRTA* (Online)":       (LrtaStarSearch(),           ""),
+            # Adversarial Search
+            "Minimax":              (MinimaxSearch(),            default_start),
+            "Alpha-Beta":           (AlphaBetaSearch(),          default_start),
         }
-        
+
         bench_results = []
-        
-        with st.spinner("Đang chạy benchmark toàn bộ 9 thuật toán..."):
-            for name, algo in algorithms_to_compare.items():
+
+        with st.spinner("Đang chạy benchmark toàn bộ 12 thuật toán..."):
+            for name, (algo, start_node) in algorithms_to_compare.items():
                 t_start = time.perf_counter()
-                path, cost, stats = algo.search(graph, "", "")
-                t_end = time.perf_counter()
-                
-                bench_results.append({
-                    "Thuật toán": name,
-                    "Xếp thành công": "✓ Có" if path is not None else "✗ Không",
-                    "Thời gian (ms)": (t_end - t_start) * 1000,
-                    "Nút đã duyệt": stats.get("explored_nodes", 0),
-                    "Điểm phạt vi phạm": cost,
-                    "Chất lượng (Fitness)": stats.get("fitness", 0.0)
-                })
-                
+                try:
+                    path, cost, stats = algo.search(graph, start_node, "")
+                    t_end = time.perf_counter()
+
+                    # Adversarial algorithms trả fitness qua best_value
+                    fitness_val = stats.get("fitness", None)
+                    if fitness_val is None:
+                        fitness_val = stats.get("best_value", 0.0)
+
+                    bench_results.append({
+                        "Thuật toán": name,
+                        "Nhóm": (
+                            "Uninformed" if name in ["BFS", "DFS"] else
+                            "Informed"   if name in ["Greedy", "A*"] else
+                            "Local"      if name in ["Hill Climbing", "Simulated Annealing"] else
+                            "CSP"        if name in ["CSP Backtracking", "CSP Min-Conflicts"] else
+                            "Complex"    if name in ["AND-OR Search", "LRTA* (Online)"] else
+                            "Adversarial"
+                        ),
+                        "Xếp thành công": "✓ Có" if path is not None else "✗ Không",
+                        "Thời gian (ms)": round((t_end - t_start) * 1000, 3),
+                        "Nút đã duyệt": stats.get("explored_nodes", 0),
+                        "Điểm phạt vi phạm": round(cost, 2),
+                        "Chất lượng (Fitness)": round(float(fitness_val), 2)
+                    })
+                except Exception as e:
+                    bench_results.append({
+                        "Thuật toán": name,
+                        "Nhóm": "N/A",
+                        "Xếp thành công": "✗ Lỗi",
+                        "Thời gian (ms)": 0.0,
+                        "Nút đã duyệt": 0,
+                        "Điểm phạt vi phạm": 0.0,
+                        "Chất lượng (Fitness)": 0.0
+                    })
+
         df_bench = pd.DataFrame(bench_results)
         st.dataframe(df_bench, use_container_width=True)
-        
+
         # Plotting charts
         col1, col2 = st.columns(2)
         with col1:
-            fig, ax = plt.subplots(figsize=(6, 4))
+            fig, ax = plt.subplots(figsize=(8, 4))
             fig.patch.set_facecolor('#1e293b')
             ax.set_facecolor('#0f172a')
-            ax.bar(df_bench["Thuật toán"], df_bench["Thời gian (ms)"], color="#66fcf1")
-            ax.set_title("Thời gian thực thi (ms) - Ít hơn là tốt hơn", color="white")
+            colors = ["#66fcf1" if r["Xếp thành công"] == "✓ Có" else "#e74c3c" for _, r in df_bench.iterrows()]
+            ax.bar(df_bench["Thuật toán"], df_bench["Thời gian (ms)"], color=colors)
+            ax.set_title("Thời gian thực thi (ms) — Ít hơn là tốt hơn", color="white")
             ax.tick_params(colors="white")
-            plt.xticks(rotation=45, ha="right")
+            plt.xticks(rotation=45, ha="right", fontsize=8)
             st.pyplot(fig)
-            
+
         with col2:
-            fig, ax = plt.subplots(figsize=(6, 4))
+            fig, ax = plt.subplots(figsize=(8, 4))
             fig.patch.set_facecolor('#1e293b')
             ax.set_facecolor('#0f172a')
             ax.bar(df_bench["Thuật toán"], df_bench["Chất lượng (Fitness)"], color="#45a29e")
-            ax.set_title("Chất lượng TKB (Fitness) - Cao hơn là tốt hơn", color="white")
+            ax.set_title("Chất lượng TKB (Fitness) — Cao hơn là tốt hơn", color="white")
             ax.tick_params(colors="white")
-            plt.xticks(rotation=45, ha="right")
+            plt.xticks(rotation=45, ha="right", fontsize=8)
             st.pyplot(fig)
 
 # ----------------------------------------------------
